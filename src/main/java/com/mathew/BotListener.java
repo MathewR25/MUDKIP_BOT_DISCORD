@@ -129,7 +129,7 @@ public class BotListener extends ListenerAdapter {
                 return;
             }
 
-            partido.setAbierto(false); // Cerramos la recepción de apuestas para este partido
+            partidoEncontrado.setAbierto(false); // Corregido el objeto para que use partidoEncontrado
 
             EmbedBuilder embedPausa = new EmbedBuilder()
                     .setTitle("🔒 APUESTAS CERRADAS TEMPORALMENTE")
