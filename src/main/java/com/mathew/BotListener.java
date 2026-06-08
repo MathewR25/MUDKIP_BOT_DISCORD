@@ -380,20 +380,20 @@ public class BotListener extends ListenerAdapter {
         if (event.getMessage().getMentions().isMentioned(event.getJDA().getSelfUser()) 
                 && event.getChannel().getId().equals(CANAL_GENERAL_ID)) {
             
-            File gif1 = new File("gifs/mudkip (1).gif");
-            File gif2 = new File("gifs/mudkip.gif");
-            File gif3 = new File("gifs/pokemon-mudkip.gif");
-            File[] listaGifs = {gif1, gif2, gif3};
+            String[] listaGifs = {"gifs/mudkip (1).gif", "gifs/mudkip.gif", "gifs/pokemon-mudkip.gif"};
 
             int indiceAleatorio = random.nextInt(listaGifs.length);
-            File gifSeleccionado = listaGifs[indiceAleatorio];
+            String gifSeleccionado = listaGifs[indiceAleatorio];
 
-            if (!gifSeleccionado.exists()) {
-                System.out.println("⚠️ [Mudkip] Archivo NO encontrado en la ruta: " + gifSeleccionado.getAbsolutePath());
+            System.out.println("🤖 [Mudkip] Intentando cargar recurso: " + gifSeleccionado);
+
+            java.io.InputStream streamGif = getClass().getClassLoader().getResourceAsStream(gifSeleccionado);
+
+            if (streamGif == null) {
+                System.out.println("⚠️ [Mudkip] Recurso NO encontrado dentro del JAR: " + gifSeleccionado);
+                event.getChannel().sendMessage("¡Mudkip no encuentra sus animaciones en el servidor! 🌊").queue();
                 return; 
             }
-
-            System.out.println("🤖 [Mudkip] Intentando enviar: " + gifSeleccionado.getName());
 
             event.getChannel().sendTyping().queue();
 
@@ -404,15 +404,15 @@ public class BotListener extends ListenerAdapter {
             String nombreAdjunto = "mudkip_animado.gif";
             embed.setImage("attachment://" + nombreAdjunto); 
 
-            FileUpload fileUpload = FileUpload.fromData(gifSeleccionado, nombreAdjunto);
+            FileUpload fileUpload = FileUpload.fromData(streamGif, nombreAdjunto);
 
             event.getChannel().sendMessageEmbeds(embed.build())
                     .addFiles(fileUpload)
                     .queue(
-                        exito -> System.out.println("✅ [Mudkip] ¡GIF enviado con éxito!"),
+                        exito -> System.out.println("✅ [Mudkip] ¡GIF enviado con éxito desde recursos!"),
                         error -> {
                             System.out.println("❌ [Mudkip] Discord rechazó el envío: " + error.getMessage());
-                            event.getChannel().sendMessage("¡Mudkip se resbaló con el archivo! 🌊 (Error de red)").queue();
+                            event.getChannel().sendMessage("¡Mudkip se resbaló con el archivo! 🌊").queue();
                         }
                     );
         }
