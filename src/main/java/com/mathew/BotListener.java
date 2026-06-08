@@ -14,6 +14,8 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class BotListener extends ListenerAdapter {
 
@@ -35,7 +37,8 @@ public class BotListener extends ListenerAdapter {
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String nombreComando = event.getName();
 
-        if (nombreComando.equals("crear-rol") || nombreComando.equals("partido-fijar") || nombreComando.equals("partido-borrar") || nombreComando.equals("apuesta-cerrar")) {
+        // Se añade 'pausar-apuestas' a la verificación de rol ADMIN
+        if (nombreComando.equals("crear-rol") || nombreComando.equals("partido-fijar") || nombreComando.equals("partido-borrar") || nombreComando.equals("apuesta-cerrar") || nombreComando.equals("pausar-apuestas")) {
             Role rolAdmin = event.getGuild().getRoleById(ID_ROL_ADMIN);
             if (rolAdmin == null || !event.getMember().getRoles().contains(rolAdmin)) {
                 EmbedBuilder errorEmbed = new EmbedBuilder()
@@ -98,8 +101,6 @@ public class BotListener extends ListenerAdapter {
             }
 
             listaPartidos.remove(partidoEncontrado);
-            
-            // --- CAMBIO AQUÍ: REINICIO DE ID ---
             if (listaPartidos.isEmpty()) contadorIdPartido = 1;
 
             EmbedBuilder embedBorrar = new EmbedBuilder()
@@ -109,6 +110,36 @@ public class BotListener extends ListenerAdapter {
                     .setColor(Color.ORANGE);
 
             event.replyEmbeds(embedBorrar.build()).queue();
+        }
+
+        // NUEVO COMANDO: /pausar-apuestas
+        if (nombreComando.equals("pausar-apuestas")) {
+            int idBuscar = event.getOption("id_partido").getAsInt();
+            Partido partidoEncontrado = null;
+
+            for (Partido p : listaPartidos) {
+                if (p.getId() == idBuscar) {
+                    partidoEncontrado = p;
+                    break;
+                }
+            }
+
+            if (partidoEncontrado == null) {
+                event.reply("❌ No se encontró ningún partido activo con el ID #" + idBuscar).setEphemeral(true).queue();
+                return;
+            }
+
+            partido.setAbierto(false); // Cerramos la recepción de apuestas para este partido
+
+            EmbedBuilder embedPausa = new EmbedBuilder()
+                    .setTitle("🔒 APUESTAS CERRADAS TEMPORALMENTE")
+                    .setDescription("Las apuestas para el partido **ID #" + idBuscar + "** (" + partidoEncontrado.getEquipoA() + " VS " + partidoEncontrado.getEquipoB() + ") han sido pausadas.\n\n" +
+                                    "⏳ Ya no se admiten más jugadas para este encuentro. ¡Suerte a los participantes!")
+                    .setColor(Color.RED)
+                    .setFooter("Coronel Mudkip - Apuestas Pausadas");
+
+            event.replyEmbeds(embedPausa.build()).queue();
+            return;
         }
 
         if (nombreComando.equals("apuesta-cerrar")) {
@@ -141,7 +172,6 @@ public class BotListener extends ListenerAdapter {
 
             if (pozoGanador == 0) {
                 listaPartidos.remove(partidoEncontrado);
-                // --- CAMBIO AQUÍ ---
                 if (listaPartidos.isEmpty()) contadorIdPartido = 1;
 
                 event.reply("🏁 Partido #" + idBuscar + " cerrado. Nadie apostó por la opción ganadora `" + resultadoAdmin + "`. El pozo de " + MANGO + " **" + pozoTotal + "** se ha perdido.").queue();
@@ -167,7 +197,6 @@ public class BotListener extends ListenerAdapter {
             }
 
             listaPartidos.remove(partidoEncontrado);
-            // --- CAMBIO AQUÍ ---
             if (listaPartidos.isEmpty()) contadorIdPartido = 1;
 
             EmbedBuilder embedCierre = new EmbedBuilder()
@@ -200,8 +229,9 @@ public class BotListener extends ListenerAdapter {
                     .setFooter("Usa /apostar [id] [monto] para jugar en tu panel interactivo privado.");
 
             for (Partido p : listaPartidos) {
+                String estado = p.isAbierto() ? "" : " 🔒 *(APUESTAS PAUSADAS)*";
                 embedCartelera.addField(
-                    "🆔 Partido ID: " + p.getId(),
+                    "🆔 Partido ID: " + p.getId() + estado,
                     "⚔️ " + p.getEquipoA() + " **VS** " + p.getEquipoB() + "\n💰 **Pozo actual:** " + MANGO + " **" + ((long) p.getPozoTotal()) + "**\n",
                     false
                 );
@@ -230,6 +260,12 @@ public class BotListener extends ListenerAdapter {
                 return;
             }
 
+            // Validación al intentar abrir el panel usando el comando /apostar
+            if (!partidoEncontrado.isAbierto()) {
+                event.reply("❌ ESTE PARTIDO YA NO ADMITE APUESTAS, MUDKIP MUDKIP").setEphemeral(true).queue();
+                return;
+            }
+
             EmbedBuilder embedPanel = new EmbedBuilder()
                     .setTitle("🏟️ Panel de Confirmación de Apuesta")
                     .setDescription("Encuentro: **" + partidoEncontrado.getEquipoA() + " VS " + partidoEncontrado.getEquipoB() + "**\n" +
@@ -237,19 +273,8 @@ public class BotListener extends ListenerAdapter {
                                     " *Selecciona tu opción favorita presionando los botones compactos de abajo:*")
                     .setColor(new Color(173, 230, 250));
 
-            Emoji emojiA = Emoji.fromUnicode("⚽");
-            Emoji emojiB = Emoji.fromUnicode("⚽");
-
-            try {
-                if (partidoEncontrado.getEquipoA().contains("<")) {
-                    String rawEmoji = partidoEncontrado.getEquipoA().substring(partidoEncontrado.getEquipoA().indexOf("<"), partidoEncontrado.getEquipoA().indexOf(">") + 1);
-                    emojiA = Emoji.fromFormatted(rawEmoji);
-                }
-                if (partidoEncontrado.getEquipoB().contains("<")) {
-                    String rawEmoji = partidoEncontrado.getEquipoB().substring(partidoEncontrado.getEquipoB().indexOf("<"), partidoEncontrado.getEquipoB().indexOf(">") + 1);
-                    emojiB = Emoji.fromFormatted(rawEmoji);
-                }
-            } catch (Exception e) {}
+            Emoji emojiA = extraerEmoji(partidoEncontrado.getEquipoA());
+            Emoji emojiB = extraerEmoji(partidoEncontrado.getEquipoB());
 
             event.replyEmbeds(embedPanel.build())
                     .setEphemeral(true)
@@ -260,6 +285,30 @@ public class BotListener extends ListenerAdapter {
                         Button.secondary("AP_DF_" + idBuscar + "_" + monto, "DF 💀")
                     ).queue();
         }
+    }
+
+    private Emoji extraerEmoji(String texto) {
+        if (texto == null || texto.isEmpty()) return Emoji.fromUnicode("⚽");
+
+        Pattern customPattern = Pattern.compile("<a?:\\w+:(\\d+)>");
+        Matcher matcher = customPattern.matcher(texto);
+        if (matcher.find()) {
+            return Emoji.fromFormatted(matcher.group());
+        }
+
+        int codePoint = texto.codePointAt(0);
+        if (Character.getType(codePoint) == Character.OTHER_SYMBOL || codePoint > 0x1F000) {
+            String emojiUnicode = new String(Character.toChars(codePoint));
+            if (texto.length() > 2) {
+                int secondCodePoint = texto.codePointAt(Character.charCount(codePoint));
+                if (secondCodePoint >= 0x1F1E6 && secondCodePoint <= 0x1F1FF) {
+                    emojiUnicode += new String(Character.toChars(secondCodePoint));
+                }
+            }
+            return Emoji.fromUnicode(emojiUnicode);
+        }
+
+        return Emoji.fromUnicode("⚽");
     }
 
     @Override
@@ -281,6 +330,12 @@ public class BotListener extends ListenerAdapter {
 
             if (partido == null) {
                 event.reply("❌ Error: Este partido ya no se encuentra disponible en la cartelera.").setEphemeral(true).queue();
+                return;
+            }
+
+            // Validación de seguridad si el usuario presiona un botón viejo de un panel ya abierto
+            if (!partido.isAbierto()) {
+                event.reply("❌ ESTE PARTIDO YA NO ADMITE APUESTAS, MUDKIP MUDKIP").setEphemeral(true).queue();
                 return;
             }
 
