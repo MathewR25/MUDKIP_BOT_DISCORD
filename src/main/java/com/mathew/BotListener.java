@@ -47,12 +47,10 @@ public class BotListener extends ListenerAdapter {
             }
         }
 
-        // Comando Crear Rol Intacto
         if (nombreComando.equals("crear-rol")) {
             rolComando.ejecutar(event);
         }
 
-        // 🏟️ COMANDO ADMIN: FIJAR PARTIDO
         if (nombreComando.equals("partido-fijar")) {
             String equipoA = event.getOption("equipo_a").getAsString();
             String equipoB = event.getOption("equipo_b").getAsString();
@@ -74,7 +72,6 @@ public class BotListener extends ListenerAdapter {
             contadorIdPartido++;
         }
 
-        // 🗑️ COMANDO ADMIN: BORRAR PARTIDO (CON REEMBOLSO AUTOMÁTICO)
         if (nombreComando.equals("partido-borrar")) {
             int idBuscar = event.getOption("id_partido").getAsInt();
             Partido partidoEncontrado = null;
@@ -91,7 +88,6 @@ public class BotListener extends ListenerAdapter {
                 return;
             }
 
-            // Devolución automática mediante API a UnbelievaBoat
             for (Apuesta ap : partidoEncontrado.getApuestas()) {
                 boolean devuelto = unbelieva.modificarSaldo(ap.getUsuarioId(), ap.getCantidad(), "Reembolso: Partido #" + idBuscar + " Cancelado");
                 if (devuelto) {
@@ -102,6 +98,9 @@ public class BotListener extends ListenerAdapter {
             }
 
             listaPartidos.remove(partidoEncontrado);
+            
+            // --- CAMBIO AQUÍ: REINICIO DE ID ---
+            if (listaPartidos.isEmpty()) contadorIdPartido = 1;
 
             EmbedBuilder embedBorrar = new EmbedBuilder()
                     .setTitle("🗑️ PARTIDO CANCELADO / BORRADO")
@@ -112,10 +111,8 @@ public class BotListener extends ListenerAdapter {
             event.replyEmbeds(embedBorrar.build()).queue();
         }
 
-        // 🏁 COMANDO ADMIN: CERRAR APUESTA Y DISTRIBUIR POZO EN ENTEROS PUROS (MODIFICADO Y BLINDADO)
         if (nombreComando.equals("apuesta-cerrar")) {
             int idBuscar = event.getOption("id_partido").getAsInt();
-            // Normalizamos el texto ingresado por el administrador eliminando espacios vacíos externos
             String resultadoAdmin = event.getOption("resultado").getAsString().toUpperCase().trim(); 
             Partido partidoEncontrado = null;
 
@@ -134,38 +131,31 @@ public class BotListener extends ListenerAdapter {
             long pozoTotal = 0;
             long pozoGanador = 0;
 
-            // 1. Recalculamos los pozos leyendo los datos crudos para evitar desajustes de tipos de datos
             for (Apuesta ap : partidoEncontrado.getApuestas()) {
                 String opcionApuesta = ap.getOpcion().toUpperCase();
                 pozoTotal += ap.getCantidad();
-                
-                // Comparación flexible bidireccional (.contains) para emparejar por ejemplo "DF" con "GANADOR_DF"
                 if (opcionApuesta.contains(resultadoAdmin) || resultadoAdmin.contains(opcionApuesta)) {
                     pozoGanador += ap.getCantidad();
                 }
             }
 
-            // Si nadie apostó a la opción ganadora
             if (pozoGanador == 0) {
                 listaPartidos.remove(partidoEncontrado);
+                // --- CAMBIO AQUÍ ---
+                if (listaPartidos.isEmpty()) contadorIdPartido = 1;
+
                 event.reply("🏁 Partido #" + idBuscar + " cerrado. Nadie apostó por la opción ganadora `" + resultadoAdmin + "`. El pozo de " + MANGO + " **" + pozoTotal + "** se ha perdido.").queue();
                 return;
             }
 
-            // 2. Distribución proporcional exacta del premio total acumulado
             int ganadoresPagados = 0;
             for (Apuesta ap : partidoEncontrado.getApuestas()) {
                 String opcionApuesta = ap.getOpcion().toUpperCase();
-                
                 if (opcionApuesta.contains(resultadoAdmin) || resultadoAdmin.contains(opcionApuesta)) {
                     long apuestaUsuario = ap.getCantidad();
-                    
-                    // 🧮 FÓRMULA PROPORCIONAL MULTI-MILLONARIA PROTEGIDA:
-                    // Usamos variables de punto flotante de 64 bits (double) intermedios para prevenir un desbordamiento matemático (overflow)
                     double calculoProporcional = ((double) apuestaUsuario * (double) pozoTotal) / (double) pozoGanador;
                     long premioFinal = (long) calculoProporcional;
 
-                    // Enviamos el premio total completo al Banco usando la nueva estructura String de UnbelievaClient
                     boolean pagoExitoso = unbelieva.modificarSaldo(ap.getUsuarioId(), premioFinal, "Premio Proporcional Partido #" + idBuscar);
                     if (pagoExitoso) {
                         System.out.println("💰 [Mudkip Premio] Distribuidos " + premioFinal + " mangos totales a: " + ap.getUsuarioId());
@@ -177,6 +167,8 @@ public class BotListener extends ListenerAdapter {
             }
 
             listaPartidos.remove(partidoEncontrado);
+            // --- CAMBIO AQUÍ ---
+            if (listaPartidos.isEmpty()) contadorIdPartido = 1;
 
             EmbedBuilder embedCierre = new EmbedBuilder()
                     .setTitle("🏁 ¡PARTIDO CERRADO Y POZO DISTRIBUIDO!")
@@ -191,7 +183,6 @@ public class BotListener extends ListenerAdapter {
             event.replyEmbeds(embedCierre.build()).queue();
         }
 
-        // 🏟️ COMANDO PÚBLICO: VER CARTELERA DE PARTIDOS
         if (nombreComando.equals("partidos")) {
             if (listaPartidos.isEmpty()) {
                 EmbedBuilder embedVacio = new EmbedBuilder()
@@ -199,7 +190,6 @@ public class BotListener extends ListenerAdapter {
                         .setDescription("Actualmente no hay partidos disponibles en el mostrador.\n¡Vuelve más tarde para realizar tus apuestas!")
                         .setColor(Color.ORANGE)
                         .setFooter("Coronel Mudkip - Sistema de Control");
-
                 event.replyEmbeds(embedVacio.build()).queue();
                 return;
             }
@@ -216,15 +206,12 @@ public class BotListener extends ListenerAdapter {
                     false
                 );
             }
-
             event.replyEmbeds(embedCartelera.build()).queue();
         }
 
-        // 💰 COMANDO PÚBLICO: APOSTAR (DESPLIEGA PANEL SECO INTERACTIVO)
         if (nombreComando.equals("apostar")) {
             int idBuscar = event.getOption("id_partido").getAsInt();
             long monto = event.getOption("monto").getAsLong();
-
             if (monto < 100) {
                 event.reply("❌ ¡La apuesta mínima permitida es de **100** " + MANGO + "! Por favor ingresa una cantidad válida.").setEphemeral(true).queue();
                 return;
@@ -262,9 +249,7 @@ public class BotListener extends ListenerAdapter {
                     String rawEmoji = partidoEncontrado.getEquipoB().substring(partidoEncontrado.getEquipoB().indexOf("<"), partidoEncontrado.getEquipoB().indexOf(">") + 1);
                     emojiB = Emoji.fromFormatted(rawEmoji);
                 }
-            } catch (Exception e) {
-                // Conservar balones por defecto
-            }
+            } catch (Exception e) {}
 
             event.replyEmbeds(embedPanel.build())
                     .setEphemeral(true)
@@ -280,27 +265,11 @@ public class BotListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String idBoton = event.getComponentId();
-
         if (idBoton.startsWith("AP_")) {
             String[] partes = idBoton.split("_");
-            String opcionSeleccionada;
-            int idPartido;
-            long monto;
-
-            if (partes[1].equals("EMPATE") || partes[1].equals("DF")) {
-                opcionSeleccionada = "GANADOR_" + partes[1];
-                idPartido = Integer.parseInt(partes[2]);
-                monto = Long.parseLong(partes[3]);
-            } else {
-                opcionSeleccionada = "GANADOR_" + partes[1]; 
-                idPartido = Integer.parseInt(partes[2]);
-                monto = Long.parseLong(partes[3]);
-            }
-
-            if (monto < 100) {
-                event.reply("❌ ¡La apuesta mínima es de **100** " + MANGO + "! Por favor genera un panel nuevo.").setEphemeral(true).queue();
-                return;
-            }
+            String opcionSeleccionada = "GANADOR_" + partes[1];
+            int idPartido = Integer.parseInt(partes[2]);
+            long monto = Long.parseLong(partes[3]);
 
             Partido partido = null;
             for (Partido p : listaPartidos) {
@@ -318,102 +287,44 @@ public class BotListener extends ListenerAdapter {
             String usuarioId = event.getUser().getId();
             for (Apuesta ap : partido.getApuestas()) {
                 if (ap.getUsuarioId().equals(usuarioId)) {
-                    event.reply("❌ ¡Ya registraste una apuesta en este encuentro! Solo se permite una apuesta por persona para cada partido.")
-                            .setEphemeral(true).queue();
+                    event.reply("❌ ¡Ya registraste una apuesta en este encuentro! Solo se permite una apuesta por persona para cada partido.").setEphemeral(true).queue();
                     return;
                 }
             }
 
-            long saldoTotal = 0;
-            try {
-                String url = "https://unbelievaboat.com/api/v1/guilds/" + SERVER_ID + "/users/" + usuarioId;
-                okhttp3.Request request = new okhttp3.Request.Builder()
-                        .url(url)
-                        .header("Authorization", UNBELIEVA_TOKEN)
-                        .header("Accept", "application/json")
-                        .get()
-                        .build();
-
-                okhttp3.OkHttpClient clientTmp = new okhttp3.OkHttpClient();
-                try (okhttp3.Response response = clientTmp.newCall(request).execute()) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String body = response.body().string();
-                        if (body.contains("\"total\":")) {
-                            String sub = body.substring(body.indexOf("\"total\":") + 8);
-                            String val = sub.split("[,}]")[0].trim();
-                            saldoTotal = (long) Double.parseDouble(val.replace("\"", ""));
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                saldoTotal = unbelieva.getBankBalance(usuarioId);
-            }
-
-            if (saldoTotal < monto) {
-                event.reply("❌ ¡" + MANGO + " insuficientes! Tu saldo Total actual es de " + MANGO + " **" + saldoTotal + "** y estás intentando apostar **" + monto + "**.")
-                        .setEphemeral(true).queue();
-                return;
-            }
-
             boolean cobroExitoso = unbelieva.modificarSaldo(usuarioId, -monto, "Apuesta Partido #" + idPartido);
-            if (!cobroExitoso) {
-                event.reply("❌ Hubo un error de comunicación con UnbelievaBoat. Inténtalo de nuevo.").setEphemeral(true).queue();
-                return;
+            if (cobroExitoso) {
+                partido.getApuestas().add(new Apuesta(usuarioId, monto, opcionSeleccionada));
+                partido.agregarMonedasAlPozo(monto);
+                event.reply("✅ ¡Apuesta procesada con éxito!\nHas jugado **" + monto + "** " + MANGO + " a la opción `" + opcionSeleccionada + "` para el Partido #" + idPartido + ".").setEphemeral(true).queue();
+                System.out.println("🤖 [Mudkip] Jugador " + event.getUser().getName() + " metió " + monto + " monedas al partido #" + idPartido);
             }
-
-            Apuesta nuevaApuesta = new Apuesta(usuarioId, monto, opcionSeleccionada);
-            partido.getApuestas().add(nuevaApuesta);
-            partido.agregarMonedasAlPozo(monto);
-
-            event.reply("✅ ¡Apuesta procesada con éxito!\nHas jugado **" + monto + "** " + MANGO + " a la opción `" + opcionSeleccionada + "` para el Partido #" + idPartido + ".")
-                    .setEphemeral(true).queue();
-            
-            System.out.println("🤖 [Mudkip] Jugador " + event.getUser().getName() + " metió " + monto + " monedas al partido #" + idPartido);
         }
     }
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
         if (event.getAuthor().isBot()) return;
-
-        if (event.getMessage().getMentions().isMentioned(event.getJDA().getSelfUser()) 
-                && event.getChannel().getId().equals(CANAL_GENERAL_ID)) {
-            
+        if (event.getMessage().getMentions().isMentioned(event.getJDA().getSelfUser()) && event.getChannel().getId().equals(CANAL_GENERAL_ID)) {
             String[] listaGifs = {"gifs/mudkip (1).gif", "gifs/mudkip.gif", "gifs/pokemon-mudkip.gif"};
-
             int indiceAleatorio = random.nextInt(listaGifs.length);
             String gifSeleccionado = listaGifs[indiceAleatorio];
 
-            System.out.println("🤖 [Mudkip] Intentando cargar recurso: " + gifSeleccionado);
-
             java.io.InputStream streamGif = getClass().getClassLoader().getResourceAsStream(gifSeleccionado);
-
             if (streamGif == null) {
-                System.out.println("⚠️ [Mudkip] Recurso NO encontrado dentro del JAR: " + gifSeleccionado);
                 event.getChannel().sendMessage("¡Mudkip no encuentra sus animaciones en el servidor! 🌊").queue();
                 return; 
             }
 
             event.getChannel().sendTyping().queue();
-
-            EmbedBuilder embed = new EmbedBuilder();
-            embed.setDescription("**¡MUDKI MUDKIP!!!** 🌊"); 
-            embed.setColor(new Color(173, 230, 250)); 
-            
-            String nombreAdjunto = "mudkip_animado.gif";
-            embed.setImage("attachment://" + nombreAdjunto); 
-
-            FileUpload fileUpload = FileUpload.fromData(streamGif, nombreAdjunto);
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setDescription("**¡MUDKI MUDKIP!!!** 🌊")
+                    .setColor(new Color(173, 230, 250))
+                    .setImage("attachment://mudkip_animado.gif");
 
             event.getChannel().sendMessageEmbeds(embed.build())
-                    .addFiles(fileUpload)
-                    .queue(
-                        exito -> System.out.println("✅ [Mudkip] ¡GIF enviado con éxito desde recursos!"),
-                        error -> {
-                            System.out.println("❌ [Mudkip] Discord rechazó el envío: " + error.getMessage());
-                            event.getChannel().sendMessage("¡Mudkip se resbaló con el archivo! 🌊").queue();
-                        }
-                    );
+                    .addFiles(FileUpload.fromData(streamGif, "mudkip_animado.gif"))
+                    .queue(exito -> System.out.println("✅ [Mudkip] ¡GIF enviado con éxito desde recursos!"), error -> System.out.println("❌ [Mudkip] Discord rechazó el envío: " + error.getMessage()));
         }
     }
 }
