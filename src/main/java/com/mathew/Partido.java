@@ -9,6 +9,7 @@ public class Partido {
     private final String equipoB;
     private double pozoTotal;
     private final List<Apuesta> apuestas;
+    private boolean abierto; // <- Agregado de forma segura
 
     public Partido(int id, String equipoA, String equipoB) {
         this.id = id;
@@ -16,6 +17,7 @@ public class Partido {
         this.equipoB = equipoB;
         this.pozoTotal = 0.0;
         this.apuestas = new ArrayList<>();
+        this.abierto = true; // <- Inicia abierto por defecto
     }
 
     public int getId() { return id; }
@@ -23,6 +25,10 @@ public class Partido {
     public String getEquipoB() { return equipoB; }
     public double getPozoTotal() { return pozoTotal; }
     public List<Apuesta> getApuestas() { return apuestas; }
+
+    // --- Métodos de control para el comando /pausar-apuestas ---
+    public boolean isAbierto() { return abierto; }
+    public void setAbierto(boolean abierto) { this.abierto = abierto; }
 
     public void agregarMonedasAlPozo(double cantidad) {
         this.pozoTotal += cantidad;
