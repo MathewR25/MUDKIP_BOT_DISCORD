@@ -4,7 +4,7 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
-import net.dv8tion.jda.api.interactions.commands.build.OptionData; // 🚨 IMPORTANTE: JDA necesita esto para las opciones múltiples
+import net.dv8tion.jda.api.interactions.commands.build.OptionData; 
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 public class App {
@@ -39,6 +39,10 @@ public class App {
 
                         Commands.slash("partido-borrar", "Elimina un partido del mostrador usando su ID")
                                 .addOption(OptionType.INTEGER, "id_partido", "El número de ID del partido que deseas borrar", true),
+
+                        // --- NUEVO COMANDO REGISTRADO AQUÍ ---
+                        Commands.slash("pausar-apuestas", "Pausa las apuestas de un partido para que nadie más pueda jugar")
+                                .addOption(OptionType.INTEGER, "id_partido", "El ID del partido que deseas pausar", true),
 
                         Commands.slash("apuesta-cerrar", "Cierra un partido, calcula la ecuación y reparte el pozo")
                                 .addOptions(
