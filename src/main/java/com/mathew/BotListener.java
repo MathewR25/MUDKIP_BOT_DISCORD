@@ -380,9 +380,9 @@ public class BotListener extends ListenerAdapter {
         if (event.getMessage().getMentions().isMentioned(event.getJDA().getSelfUser()) 
                 && event.getChannel().getId().equals(CANAL_GENERAL_ID)) {
             
-            File gif1 = new File("gifs\\mudkip (1).gif");
-            File gif2 = new File("gifs\\mudkip.gif");
-            File gif3 = new File("gifs\\pokemon-mudkip.gif");
+            File gif1 = new File("gifs/mudkip (1).gif");
+            File gif2 = new File("gifs/mudkip.gif");
+            File gif3 = new File("gifs/pokemon-mudkip.gif");
             File[] listaGifs = {gif1, gif2, gif3};
 
             int indiceAleatorio = random.nextInt(listaGifs.length);
