@@ -50,6 +50,7 @@ public class BotListener extends ListenerAdapter {
         }
 
         if (nombreComando.equals("crear-rol")) {
+            event.deferReply(true).queue();
             rolComando.ejecutar(event);
         }
 
