@@ -37,7 +37,6 @@ public class BotListener extends ListenerAdapter {
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String nombreComando = event.getName();
 
-        // Se añade 'pausar-apuestas' a la verificación de rol ADMIN
         if (nombreComando.equals("crear-rol") || nombreComando.equals("partido-fijar") || nombreComando.equals("partido-borrar") || nombreComando.equals("apuesta-cerrar") || nombreComando.equals("pausar-apuestas")) {
             Role rolAdmin = event.getGuild().getRoleById(ID_ROL_ADMIN);
             if (rolAdmin == null || !event.getMember().getRoles().contains(rolAdmin)) {
@@ -45,12 +44,13 @@ public class BotListener extends ListenerAdapter {
                         .setTitle("⛔ Acceso Denegado")
                         .setDescription("NO ERES ADMIN NO PUEDES USAR ESTE COMANDO, MUDKIP MUDKIP")
                         .setColor(Color.RED);
-                event.replyEmbeds(errorEmbed.build()).setEphemeral(true).queue();
+                event.replyEmbeds(errorEmbed.build()).queue();
                 return; 
             }
         }
 
         if (nombreComando.equals("crear-rol")) {
+            event.deferReply(true).queue();
             rolComando.ejecutar(event);
         }
 
@@ -243,7 +243,7 @@ public class BotListener extends ListenerAdapter {
             int idBuscar = event.getOption("id_partido").getAsInt();
             long monto = event.getOption("monto").getAsLong();
             if (monto < 100) {
-                event.reply("❌ ¡La apuesta mínima permitida es de **100** " + MANGO + "! Por favor ingresa una cantidad válida.").setEphemeral(true).queue();
+                event.reply("❌ ¡La apuesta mínima permitida es de **100** " + MANGO + "! Por favor ingresa una cantidad válida.").queue();
                 return;
             }
 
@@ -256,13 +256,13 @@ public class BotListener extends ListenerAdapter {
             }
 
             if (partidoEncontrado == null) {
-                event.reply("❌ No se encontró ningún partido con el ID #" + idBuscar).setEphemeral(true).queue();
+                event.reply("❌ No se encontró ningún partido con el ID #" + idBuscar).queue();
                 return;
             }
 
             // Validación al intentar abrir el panel usando el comando /apostar
             if (!partidoEncontrado.isAbierto()) {
-                event.reply("❌ ESTE PARTIDO YA NO ADMITE APUESTAS, MUDKIP MUDKIP").setEphemeral(true).queue();
+                event.reply("❌ ESTE PARTIDO YA NO ADMITE APUESTAS, MUDKIP MUDKIP").queue();
                 return;
             }
 
@@ -277,7 +277,6 @@ public class BotListener extends ListenerAdapter {
             Emoji emojiB = extraerEmoji(partidoEncontrado.getEquipoB());
 
             event.replyEmbeds(embedPanel.build())
-                    .setEphemeral(true)
                     .addActionRow(
                         Button.success("AP_A_" + idBuscar + "_" + monto, emojiA),
                         Button.danger("AP_B_" + idBuscar + "_" + monto, emojiB),
@@ -329,20 +328,19 @@ public class BotListener extends ListenerAdapter {
             }
 
             if (partido == null) {
-                event.reply("❌ Error: Este partido ya no se encuentra disponible en la cartelera.").setEphemeral(true).queue();
+                event.reply("❌ Error: Este partido ya no se encuentra disponible en la cartelera.").queue();
                 return;
             }
 
-            // Validación de seguridad si el usuario presiona un botón viejo de un panel ya abierto
             if (!partido.isAbierto()) {
-                event.reply("❌ ESTE PARTIDO YA NO ADMITE APUESTAS, MUDKIP MUDKIP").setEphemeral(true).queue();
+                event.reply("❌ ESTE PARTIDO YA NO ADMITE APUESTAS, MUDKIP MUDKIP").queue();
                 return;
             }
 
             String usuarioId = event.getUser().getId();
             for (Apuesta ap : partido.getApuestas()) {
                 if (ap.getUsuarioId().equals(usuarioId)) {
-                    event.reply("❌ ¡Ya registraste una apuesta en este encuentro! Solo se permite una apuesta por persona para cada partido.").setEphemeral(true).queue();
+                    event.reply("❌ ¡Ya registraste una apuesta en este encuentro! Solo se permite una apuesta por persona para cada partido.").queue();
                     return;
                 }
             }
@@ -351,7 +349,7 @@ public class BotListener extends ListenerAdapter {
             if (cobroExitoso) {
                 partido.getApuestas().add(new Apuesta(usuarioId, monto, opcionSeleccionada));
                 partido.agregarMonedasAlPozo(monto);
-                event.reply("✅ ¡Apuesta procesada con éxito!\nHas jugado **" + monto + "** " + MANGO + " a la opción `" + opcionSeleccionada + "` para el Partido #" + idPartido + ".").setEphemeral(true).queue();
+                event.reply("✅ ¡Apuesta procesada con éxito!\nHas jugado **" + monto + "** " + MANGO + " a la opción `" + opcionSeleccionada + "` para el Partido #" + idPartido + ".").queue();
                 System.out.println("🤖 [Mudkip] Jugador " + event.getUser().getName() + " metió " + monto + " monedas al partido #" + idPartido);
             }
         }
